@@ -1,0 +1,173 @@
+const Order = require('../models/Order');
+const Ticket = require('../models/Ticket');
+const Event = require('../models/Event');
+const { AppError, asyncHandler } = require('../middleware/errorHandler.middleware');
+const { getCoin, toUSD, toCrypto, roundCrypto } = require('../config/coins');
+const { generateQRCode } = require('../utils/helpers');
+const logger = require('../utils/logger');
+
+/**
+ * Create an order from cart items. Validates availability, reserves seats by
+ * decrementing tier availability, computes the crypto total, and returns the
+ * payment instructions. Status starts as `pending` until payment is confirmed.
+ */
+exports.create = asyncHandler(async (req, res, next) => {
+  const { items, attendeeName, attendeeEmail, coin: coinSymbol } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return next(new AppError('Order must contain at least one item', 400));
+  }
+
+  const coin = getCoin(coinSymbol);
+  if (!coin) return next(new AppError('Unsupported payment coin', 400));
+
+  const orderItems = [];
+  let usdTotal = 0;
+  const reservations = [];
+
+  for (const line of items) {
+    const { eventId, tierId, quantity } = line;
+    const qty = parseInt(quantity, 10);
+    if (!eventId || !tierId || !qty || qty < 1) {
+      return next(new AppError('Each item needs eventId, tierId and a quantity ≥ 1', 400));
+    }
+
+    const event = await Event.findById(eventId);
+    if (!event) return next(new AppError(`Event ${eventId} not found`, 404));
+
+    const tier = event.ticketTiers.find((t) => t._id === tierId);
+    if (!tier) return next(new AppError(`Ticket tier ${tierId} not found`, 404));
+
+    if (tier.available < qty) {
+      return next(new AppError(`Only ${tier.available} '${tier.name}' tickets left for ${event.title}`, 409));
+    }
+
+    orderItems.push({
+      eventId,
+      tierId,
+      tierName: tier.name,
+      eventTitle: event.title,
+      eventDate: event.date,
+      eventVenue: event.venue,
+      eventCity: event.city,
+      eventImage: event.image,
+      quantity: qty,
+      price: tier.price,
+      currency: tier.currency,
+    });
+
+    usdTotal += toUSD(tier.price * qty, tier.currency);
+    reservations.push({ eventId, tierId, qty });
+  }
+
+  // Reserve seats atomically per tier (guarded so we never oversell).
+  for (const r of reservations) {
+    const result = await Event.updateOne(
+      { _id: r.eventId, ticketTiers: { $elemMatch: { _id: r.tierId, available: { $gte: r.qty } } } },
+      { $inc: { 'ticketTiers.$.available': -r.qty } }
+    );
+    if (result.modifiedCount === 0) {
+      // A concurrent purchase grabbed the last seats — roll back what we reserved.
+      await rollbackReservations(reservations.slice(0, reservations.indexOf(r)));
+      return next(new AppError('Some tickets just sold out. Please review your cart', 409));
+    }
+  }
+
+  usdTotal = Number(usdTotal.toFixed(2));
+  const cryptoAmount = roundCrypto(toCrypto(usdTotal, coin), coin);
+
+  const order = await Order.create({
+    user: req.user._id,
+    items: orderItems,
+    attendee: { name: attendeeName, email: attendeeEmail },
+    coin: { symbol: coin.symbol, network: coin.network, address: coin.address },
+    usdTotal,
+    cryptoAmount,
+  });
+
+  logger.info(`Order created ${order.reference} — user ${req.user._id} — $${usdTotal}`);
+
+  res.status(201).json({
+    status: 'success',
+    data: {
+      order,
+      payment: {
+        coin: coin.symbol,
+        network: coin.network,
+        address: coin.address,
+        usdTotal,
+        cryptoAmount,
+      },
+    },
+  });
+});
+
+async function rollbackReservations(reservations) {
+  for (const r of reservations) {
+    await Event.updateOne(
+      { _id: r.eventId, 'ticketTiers._id': r.tierId },
+      { $inc: { 'ticketTiers.$.available': r.qty } }
+    );
+  }
+}
+
+/**
+ * Confirm payment for an order. In Stage 1 this trusts the supplied tx hash
+ * (a real on-chain verification step replaces this in Stage 2). On success it
+ * marks the order paid and issues one Ticket per seat.
+ */
+exports.confirm = asyncHandler(async (req, res, next) => {
+  const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+  if (!order) return next(new AppError('Order not found', 404));
+
+  if (order.status === 'paid') {
+    const existing = await Ticket.find({ order: order._id });
+    return res.json({ status: 'success', data: { order, tickets: existing } });
+  }
+  if (order.status !== 'pending') {
+    return next(new AppError(`Order cannot be paid (status: ${order.status})`, 409));
+  }
+
+  order.status = 'paid';
+  order.paidAt = new Date();
+  if (req.body.txHash) order.txHash = req.body.txHash;
+  await order.save();
+
+  const ticketDocs = [];
+  for (const item of order.items) {
+    for (let i = 0; i < item.quantity; i++) {
+      ticketDocs.push({
+        order: order._id,
+        user: order.user,
+        eventId: item.eventId,
+        tierId: item.tierId,
+        tierName: item.tierName,
+        eventTitle: item.eventTitle,
+        eventDate: item.eventDate,
+        eventVenue: item.eventVenue,
+        eventCity: item.eventCity,
+        qrCode: generateQRCode(),
+        price: item.price,
+        currency: item.currency,
+        attendeeName: order.attendee.name,
+        attendeeEmail: order.attendee.email,
+        purchasedAt: order.paidAt,
+      });
+    }
+  }
+  const tickets = await Ticket.insertMany(ticketDocs);
+
+  logger.info(`Order paid ${order.reference} — issued ${tickets.length} tickets`);
+  res.json({ status: 'success', data: { order, tickets } });
+});
+
+exports.list = asyncHandler(async (req, res) => {
+  const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+  res.json({ status: 'success', data: { orders } });
+});
+
+exports.getOne = asyncHandler(async (req, res, next) => {
+  const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+  if (!order) return next(new AppError('Order not found', 404));
+  res.json({ status: 'success', data: { order } });
+});

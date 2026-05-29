@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/temple/Documents/Rachead/management-backend 2>/dev/null; echo \"---\"; ls -la /Users/temple/Documents/Rachead 2>/dev/null)",
+      "Read(//Users/temple/Documents/Rachead/**)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"process.env.NODE_ENV='development'; require\\('./src/app'\\); require\\('./scripts/seed-data'\\); require\\('./scripts/seed.js'\\)&&0;\")",
+      "Bash(node -e \"process.env.NODE_ENV='development'; require\\('./src/app'\\); console.log\\('✓ app loads clean after cleanup'\\);\")"
+    ]
+  }
+}
