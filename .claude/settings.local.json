@@ -1,11 +1,39 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -la /Users/temple/Documents/Rachead/management-backend 2>/dev/null; echo \"---\"; ls -la /Users/temple/Documents/Rachead 2>/dev/null)",
       "Read(//Users/temple/Documents/Rachead/**)",
-      "Bash(node -e ' *)",
-      "Bash(node -e \"process.env.NODE_ENV='development'; require\\('./src/app'\\); require\\('./scripts/seed-data'\\); require\\('./scripts/seed.js'\\)&&0;\")",
-      "Bash(node -e \"process.env.NODE_ENV='development'; require\\('./src/app'\\); console.log\\('✓ app loads clean after cleanup'\\);\")"
+      "Read(//Users/temple/Documents/Rachead/management-backend/**)",
+      "Write(//Users/temple/Documents/Rachead/**)",
+      "Edit(//Users/temple/Documents/Rachead/**)",
+      "Glob(//Users/temple/Documents/Rachead/**)",
+      "Grep(**/*)",
+      "Bash(yarn *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(pnpm *)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(pkill *)",
+      "Bash(git *)",
+      "Bash(ls *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(tsc *)",
+      "Bash(vite *)",
+      "Bash(docker *)",
+      "Task(**)",
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)"
     ]
   }
 }

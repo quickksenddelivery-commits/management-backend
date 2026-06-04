@@ -33,4 +33,22 @@ const authorize = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, authorize };
+/**
+ * Optional defense-in-depth for admin routes. When ADMIN_SECRET is configured,
+ * admin requests must also carry a matching `x-admin-secret` header (the frontend
+ * already sends it). When ADMIN_SECRET is unset this is a no-op, so admin access
+ * is governed purely by the admin JWT role.
+ */
+const requireAdminSecret = (req, res, next) => {
+  if (!env.ADMIN_SECRET) return next();
+  const provided = req.headers['x-admin-secret'];
+  if (!provided || provided !== env.ADMIN_SECRET) {
+    return next(new AppError('Invalid or missing admin secret', 403));
+  }
+  next();
+};
+
+// Convenience guard for admin-only routes: valid admin JWT (+ secret when configured).
+const adminGuard = [authenticate, authorize('admin'), requireAdminSecret];
+
+module.exports = { authenticate, authorize, requireAdminSecret, adminGuard };

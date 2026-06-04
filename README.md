@@ -123,6 +123,7 @@ frontend (`celeb-1`, `event-1`, `tier-1-2`, `pkg-gold`, …).
 | GET    | `/packages`           | —     | Sponsorship packages                       |
 | GET    | `/packages/:id`       | —     | One package                                |
 | GET    | `/sponsors`           | —     | Sponsors. Filters: `eventId`, `platform=true` |
+| GET    | `/pending?eventId=`   | —     | Pending sponsor applications for an event (company + tier only) |
 | POST   | `/applications`       | —     | Submit a sponsorship application           |
 | GET    | `/applications`       | Admin | List applications (`?status=`)             |
 | PATCH  | `/applications/:id`   | Admin | Update application status                  |

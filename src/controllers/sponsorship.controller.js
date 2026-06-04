@@ -43,10 +43,49 @@ exports.apply = asyncHandler(async (req, res, next) => {
   res.status(201).json({ status: 'success', data: { application } });
 });
 
+/**
+ * Public, limited view of pending/reviewing applications for an event — powers
+ * the "pending sponsors" badges on the event detail page. Only exposes the
+ * company name, package and tier (never email/phone/budget/message).
+ */
+exports.listPendingForEvent = asyncHandler(async (req, res, next) => {
+  const { eventId } = req.query;
+  if (!eventId) return next(new AppError('eventId query param is required', 400));
+
+  const applications = await SponsorshipApplication.find(
+    { eventId, status: { $in: ['pending', 'reviewing'] } },
+    'companyName packageId packageName status createdAt'
+  )
+    .populate('packageId', 'tier')
+    .sort({ createdAt: -1 });
+
+  const pending = applications.map((a) => ({
+    id: a._id,
+    companyName: a.companyName,
+    packageName: a.packageName,
+    tier: a.packageId ? a.packageId.tier : undefined,
+    status: a.status,
+  }));
+
+  res.json({ status: 'success', data: { pending } });
+});
+
 exports.listApplications = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   const applications = await SponsorshipApplication.find(filter).sort({ createdAt: -1 });
+  res.json({ status: 'success', data: { applications } });
+});
+
+/**
+ * Applications submitted by the currently signed-in user — matched by the
+ * email on the application against the authenticated user's email. Lets users
+ * track the status of sponsorships they've applied for.
+ */
+exports.listMine = asyncHandler(async (req, res) => {
+  const applications = await SponsorshipApplication.find({
+    email: req.user.email.toLowerCase(),
+  }).sort({ createdAt: -1 });
   res.json({ status: 'success', data: { applications } });
 });
 
