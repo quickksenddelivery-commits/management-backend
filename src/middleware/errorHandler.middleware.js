@@ -55,7 +55,9 @@ const errorHandler = (err, req, res, next) => {
   err.status = err.status || 'error';
 
   if (process.env.NODE_ENV === 'development') {
-    logger.error(err);
+    // Expected client errors (operational 4xx, e.g. 401/404/422) are already
+    // recorded by the request logger — only stack-trace genuine faults.
+    if (!err.isOperational || err.statusCode >= 500) logger.error(err);
     return sendErrorDev(err, res);
   }
 
