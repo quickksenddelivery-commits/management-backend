@@ -16,6 +16,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const orderRoutes = require('./routes/order.routes');
 const ticketRoutes = require('./routes/ticket.routes');
 const sponsorshipRoutes = require('./routes/sponsorship.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/sponsorship', sponsorshipRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

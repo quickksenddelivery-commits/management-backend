@@ -31,5 +31,11 @@ module.exports = {
 
     // CORS
     CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',
+
+    // Cloudinary (image hosting). Image uploads are enabled when all three
+    // are present — otherwise the upload endpoint returns 503.
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   },
 };
