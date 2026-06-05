@@ -2,10 +2,12 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../src/models/User');
 
+// Admin credentials are seeded straight into the database — no env-var
+// dependency. After first login, change the password via the profile API.
 const ADMIN = {
   name: 'Rachead Admin',
-  email: process.env.SEED_ADMIN_EMAIL || 'admin@rachead.local',
-  password: process.env.SEED_ADMIN_PASSWORD || 'ChangeMe@123',
+  email: 'admin@rachead.local',
+  password: 'ChangeMe@123',
   role: 'admin',
 };
 
