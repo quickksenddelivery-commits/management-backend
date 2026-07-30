@@ -25,7 +25,7 @@ const slugId = (prefix) => {
 
 /** QR payload string for a ticket. */
 const generateQRCode = () => {
-  return `RCHDTKT-${Date.now()}-${uuidv4().replace(/-/g, '').slice(0, 9).toUpperCase()}`;
+  return `FCPTKT-${Date.now()}-${uuidv4().replace(/-/g, '').slice(0, 9).toUpperCase()}`;
 };
 
 const paginationMeta = (total, page, limit) => {
@@ -56,6 +56,19 @@ const maskEmail = (email) => {
   return `${user.slice(0, 2)}***@${domain}`;
 };
 
+/**
+ * Shapes a Prisma Order (with `items`/`tickets` relations loaded) into the
+ * envelope the frontend expects: nested `attendee`/`coin` objects, a flat
+ * `user` id, and `_id` kept alongside `id` for the existing frontend contract.
+ */
+const serializeOrder = (order) => ({
+  ...order,
+  _id: order.id,
+  user: order.userId,
+  attendee: { name: order.attendeeName, email: order.attendeeEmail },
+  coin: { symbol: order.coinSymbol, network: order.coinNetwork, address: order.coinAddress },
+});
+
 module.exports = {
   generateOTP,
   hashOTP,
@@ -66,4 +79,5 @@ module.exports = {
   parsePagination,
   sanitizePhone,
   maskEmail,
+  serializeOrder,
 };

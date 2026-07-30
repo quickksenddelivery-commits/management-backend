@@ -1,5 +1,5 @@
 const requiredEnvVars = [
-  'MONGODB_URI',
+  'DATABASE_URL',
   'JWT_SECRET',
   'JWT_REFRESH_SECRET',
 ];
@@ -17,8 +17,8 @@ module.exports = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: parseInt(process.env.PORT, 10) || 5001,
 
-    // Database
-    MONGODB_URI: process.env.MONGODB_URI,
+    // Database (Neon Postgres)
+    DATABASE_URL: process.env.DATABASE_URL,
 
     // JWT
     JWT_SECRET: process.env.JWT_SECRET,

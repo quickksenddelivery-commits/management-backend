@@ -1,55 +1,62 @@
-const Celebrity = require('../models/Celebrity');
-const Event = require('../models/Event');
+const { prisma } = require('../config/database');
 const { AppError, asyncHandler } = require('../middleware/errorHandler.middleware');
-const { parsePagination, paginationMeta } = require('../utils/helpers');
+const { parsePagination, paginationMeta, slugId } = require('../utils/helpers');
 
 exports.list = asyncHandler(async (req, res) => {
   const { category, search, verified } = req.query;
   const { page, limit, skip } = parsePagination(req.query);
 
-  const filter = {};
-  if (category) filter.category = category;
-  if (verified !== undefined) filter.verified = verified === 'true';
-  if (search) filter.$text = { $search: search };
+  const where = {};
+  if (category) where.category = category;
+  if (verified !== undefined) where.verified = verified === 'true';
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { bio: { contains: search, mode: 'insensitive' } },
+    ];
+  }
 
   const [data, total] = await Promise.all([
-    Celebrity.find(filter).sort({ followers: -1 }).skip(skip).limit(limit),
-    Celebrity.countDocuments(filter),
+    prisma.celebrity.findMany({ where, orderBy: { followers: 'desc' }, skip, take: limit }),
+    prisma.celebrity.count({ where }),
   ]);
 
   res.json({ status: 'success', meta: paginationMeta(total, page, limit), data: { celebrities: data } });
 });
 
 exports.getOne = asyncHandler(async (req, res, next) => {
-  const celebrity = await Celebrity.findById(req.params.id);
+  const celebrity = await prisma.celebrity.findUnique({ where: { id: req.params.id } });
   if (!celebrity) return next(new AppError('Celebrity not found', 404));
   res.json({ status: 'success', data: { celebrity } });
 });
 
 exports.getEvents = asyncHandler(async (req, res, next) => {
-  const celebrity = await Celebrity.findById(req.params.id);
+  const celebrity = await prisma.celebrity.findUnique({ where: { id: req.params.id } });
   if (!celebrity) return next(new AppError('Celebrity not found', 404));
 
-  const events = await Event.find({ celebrityId: req.params.id }).sort({ date: 1 });
+  const events = await prisma.event.findMany({
+    where: { celebrityId: req.params.id },
+    include: { ticketTiers: true },
+    orderBy: { date: 'asc' },
+  });
   res.json({ status: 'success', data: { events } });
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  const celebrity = await Celebrity.create(req.body);
+  const celebrity = await prisma.celebrity.create({ data: { id: slugId('celeb'), ...req.body } });
   res.status(201).json({ status: 'success', data: { celebrity } });
 });
 
 exports.update = asyncHandler(async (req, res, next) => {
-  const celebrity = await Celebrity.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
+  const celebrity = await prisma.celebrity
+    .update({ where: { id: req.params.id }, data: req.body })
+    .catch(() => null);
   if (!celebrity) return next(new AppError('Celebrity not found', 404));
   res.json({ status: 'success', data: { celebrity } });
 });
 
 exports.remove = asyncHandler(async (req, res, next) => {
-  const celebrity = await Celebrity.findByIdAndDelete(req.params.id);
+  const celebrity = await prisma.celebrity.delete({ where: { id: req.params.id } }).catch(() => null);
   if (!celebrity) return next(new AppError('Celebrity not found', 404));
   res.json({ status: 'success', message: 'Celebrity deleted' });
 });

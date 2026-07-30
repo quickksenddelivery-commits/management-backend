@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+enum CelebrityCategory {
+  musician
+  dj
+  comedian
+  actor
+  athlete
+  influencer
+  pastor
+  politician
+}
+
+enum EventStatus {
+  upcoming
+  live
+  past
+  sold_out
+}
+
+enum TierLevel {
+  general
+  vip
+  vvip
+  meetgreet
+}
+
+enum SponsorTier {
+  title
+  platinum
+  gold
+  silver
+  community
+}
+
+enum OrderStatus {
+  pending
+  paid
+  cancelled
+  expired
+}
+
+enum TicketStatus {
+  active
+  used
+  refunded
+}
+
+enum ApplicationStatus {
+  pending
+  reviewing
+  approved
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password      String
+  avatar        String?
+  role          UserRole  @default(user)
+  following     String[]  @default([])
+  savedEvents   String[]  @default([])
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  loginAttempts Int       @default(0)
+  lockUntil     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders  Order[]
+  tickets Ticket[]
+}
+
+model Celebrity {
+  id         String   @id
+  name       String
+  category   CelebrityCategory
+  image      String
+  coverImage String
+  verified   Boolean  @default(false)
+  followers  Int      @default(0)
+  bio        String   @default("")
+  nationality String  @default("")
+  genre      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  events Event[]
+
+  @@index([category])
+}
+
+model Event {
+  id             String      @id
+  title          String
+  subtitle       String?
+  celebrityId    String
+  celebrity      Celebrity   @relation(fields: [celebrityId], references: [id])
+  date           DateTime
+  doorsOpen      DateTime?
+  venue          String
+  city           String
+  country        String
+  image          String
+  description    String      @default("")
+  category       CelebrityCategory
+  isFeatured     Boolean     @default(false)
+  isOnline       Boolean     @default(false)
+  tags           String[]    @default([])
+  status         EventStatus @default(upcoming)
+  ageRestriction String?
+  dresscode      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  ticketTiers TicketTier[]
+  sponsors    Sponsor[]
+
+  @@index([category, status, isFeatured, date])
+}
+
+model TicketTier {
+  id        String    @id
+  eventId   String
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name      String
+  price     Float
+  currency  String
+  available Int
+  total     Int
+  perks     String[]  @default([])
+  tier      TierLevel
+
+  @@index([eventId])
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  reference    String      @unique
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  attendeeName  String
+  attendeeEmail String
+  coinSymbol   String
+  coinNetwork  String
+  coinAddress  String
+  usdTotal     Float
+  cryptoAmount Float
+  status       OrderStatus @default(pending)
+  txHash       String?
+  paidAt       DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  items   OrderItem[]
+  tickets Ticket[]
+
+  @@index([userId, createdAt])
+}
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  eventId     String
+  tierId      String
+  tierName    String
+  eventTitle  String
+  eventDate   DateTime
+  eventVenue  String
+  eventCity   String
+  eventImage  String?
+  quantity    Int
+  price       Float
+  currency    String
+}
+
+model Ticket {
+  id            String       @id @default(uuid())
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id])
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  eventId       String
+  tierId        String
+  tierName      String
+  eventTitle    String
+  eventDate     DateTime
+  eventVenue    String
+  eventCity     String
+  qrCode        String       @unique
+  price         Float
+  currency      String
+  status        TicketStatus @default(active)
+  attendeeName  String
+  attendeeEmail String
+  purchasedAt   DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model Sponsor {
+  id        String      @id
+  name      String
+  industry  String      @default("")
+  tier      SponsorTier
+  color     String      @default("#A78BFA")
+  logo      String?
+  eventId   String?
+  event     Event?      @relation(fields: [eventId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model SponsorshipPackage {
+  id             String      @id
+  tier           SponsorTier
+  name           String
+  tagline        String      @default("")
+  price          Float
+  currency       String      @default("USD")
+  slotsTotal     Int
+  slotsAvailable Int
+  benefits       String[]    @default([])
+  popular        Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  applications SponsorshipApplication[]
+}
+
+model SponsorshipApplication {
+  id          String             @id @default(uuid())
+  companyName String
+  contactName String
+  email       String
+  phone       String             @default("")
+  packageId   String
+  package     SponsorshipPackage @relation(fields: [packageId], references: [id])
+  packageName String             @default("")
+  eventId     String?
+  budget      String             @default("")
+  message     String             @default("")
+  status      ApplicationStatus  @default(pending)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status, createdAt])
+}

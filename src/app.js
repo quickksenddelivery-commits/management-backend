@@ -36,7 +36,7 @@ app.use(requestLogger);
 app.use('/api', apiLimiter);
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'management-backend', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'fanconnectpro-backend', timestamp: new Date().toISOString() });
 });
 
 app.use('/api/auth', authRoutes);

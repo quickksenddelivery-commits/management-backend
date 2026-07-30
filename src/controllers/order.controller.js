@@ -1,9 +1,7 @@
-const Order = require('../models/Order');
-const Ticket = require('../models/Ticket');
-const Event = require('../models/Event');
+const { prisma } = require('../config/database');
 const { AppError, asyncHandler } = require('../middleware/errorHandler.middleware');
 const { getCoin, toUSD, toCrypto, roundCrypto } = require('../config/coins');
-const { generateQRCode } = require('../utils/helpers');
+const { generateQRCode, generateReference, serializeOrder } = require('../utils/helpers');
 const logger = require('../utils/logger');
 
 /**
@@ -32,10 +30,10 @@ exports.create = asyncHandler(async (req, res, next) => {
       return next(new AppError('Each item needs eventId, tierId and a quantity ≥ 1', 400));
     }
 
-    const event = await Event.findById(eventId);
+    const event = await prisma.event.findUnique({ where: { id: eventId }, include: { ticketTiers: true } });
     if (!event) return next(new AppError(`Event ${eventId} not found`, 404));
 
-    const tier = event.ticketTiers.find((t) => t._id === tierId);
+    const tier = event.ticketTiers.find((t) => t.id === tierId);
     if (!tier) return next(new AppError(`Ticket tier ${tierId} not found`, 404));
 
     if (tier.available < qty) {
@@ -61,36 +59,45 @@ exports.create = asyncHandler(async (req, res, next) => {
   }
 
   // Reserve seats atomically per tier (guarded so we never oversell).
+  const reserved = [];
   for (const r of reservations) {
-    const result = await Event.updateOne(
-      { _id: r.eventId, ticketTiers: { $elemMatch: { _id: r.tierId, available: { $gte: r.qty } } } },
-      { $inc: { 'ticketTiers.$.available': -r.qty } }
-    );
-    if (result.modifiedCount === 0) {
+    const affected = await prisma.$executeRaw`
+      UPDATE "TicketTier" SET available = available - ${r.qty}
+      WHERE id = ${r.tierId} AND available >= ${r.qty}
+    `;
+    if (affected === 0) {
       // A concurrent purchase grabbed the last seats — roll back what we reserved.
-      await rollbackReservations(reservations.slice(0, reservations.indexOf(r)));
+      await rollbackReservations(reserved);
       return next(new AppError('Some tickets just sold out. Please review your cart', 409));
     }
+    reserved.push(r);
   }
 
   usdTotal = Number(usdTotal.toFixed(2));
   const cryptoAmount = roundCrypto(toCrypto(usdTotal, coin), coin);
 
-  const order = await Order.create({
-    user: req.user._id,
-    items: orderItems,
-    attendee: { name: attendeeName, email: attendeeEmail },
-    coin: { symbol: coin.symbol, network: coin.network, address: coin.address },
-    usdTotal,
-    cryptoAmount,
+  const order = await prisma.order.create({
+    data: {
+      reference: generateReference('ORD'),
+      userId: req.user.id,
+      attendeeName,
+      attendeeEmail,
+      coinSymbol: coin.symbol,
+      coinNetwork: coin.network,
+      coinAddress: coin.address,
+      usdTotal,
+      cryptoAmount,
+      items: { create: orderItems },
+    },
+    include: { items: true },
   });
 
-  logger.info(`Order created ${order.reference} — user ${req.user._id} — $${usdTotal}`);
+  logger.info(`Order created ${order.reference} — user ${req.user.id} — $${usdTotal}`);
 
   res.status(201).json({
     status: 'success',
     data: {
-      order,
+      order: serializeOrder(order),
       payment: {
         coin: coin.symbol,
         network: coin.network,
@@ -104,10 +111,9 @@ exports.create = asyncHandler(async (req, res, next) => {
 
 async function rollbackReservations(reservations) {
   for (const r of reservations) {
-    await Event.updateOne(
-      { _id: r.eventId, 'ticketTiers._id': r.tierId },
-      { $inc: { 'ticketTiers.$.available': r.qty } }
-    );
+    await prisma.$executeRaw`
+      UPDATE "TicketTier" SET available = available + ${r.qty} WHERE id = ${r.tierId}
+    `;
   }
 }
 
@@ -117,28 +123,27 @@ async function rollbackReservations(reservations) {
  * marks the order paid and issues one Ticket per seat.
  */
 exports.confirm = asyncHandler(async (req, res, next) => {
-  const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+  const order = await prisma.order.findFirst({
+    where: { id: req.params.id, userId: req.user.id },
+    include: { items: true },
+  });
   if (!order) return next(new AppError('Order not found', 404));
 
   if (order.status === 'paid') {
-    const existing = await Ticket.find({ order: order._id });
-    return res.json({ status: 'success', data: { order, tickets: existing } });
+    const existing = await prisma.ticket.findMany({ where: { orderId: order.id } });
+    return res.json({ status: 'success', data: { order: serializeOrder(order), tickets: existing } });
   }
   if (order.status !== 'pending') {
     return next(new AppError(`Order cannot be paid (status: ${order.status})`, 409));
   }
 
-  order.status = 'paid';
-  order.paidAt = new Date();
-  if (req.body.txHash) order.txHash = req.body.txHash;
-  await order.save();
-
-  const ticketDocs = [];
+  const paidAt = new Date();
+  const ticketRows = [];
   for (const item of order.items) {
     for (let i = 0; i < item.quantity; i++) {
-      ticketDocs.push({
-        order: order._id,
-        user: order.user,
+      ticketRows.push({
+        orderId: order.id,
+        userId: order.userId,
         eventId: item.eventId,
         tierId: item.tierId,
         tierName: item.tierName,
@@ -149,25 +154,42 @@ exports.confirm = asyncHandler(async (req, res, next) => {
         qrCode: generateQRCode(),
         price: item.price,
         currency: item.currency,
-        attendeeName: order.attendee.name,
-        attendeeEmail: order.attendee.email,
-        purchasedAt: order.paidAt,
+        attendeeName: order.attendeeName,
+        attendeeEmail: order.attendeeEmail,
+        purchasedAt: paidAt,
       });
     }
   }
-  const tickets = await Ticket.insertMany(ticketDocs);
 
-  logger.info(`Order paid ${order.reference} — issued ${tickets.length} tickets`);
-  res.json({ status: 'success', data: { order, tickets } });
+  const [updatedOrder] = await prisma.$transaction([
+    prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'paid', paidAt, ...(req.body.txHash && { txHash: req.body.txHash }) },
+      include: { items: true },
+    }),
+    prisma.ticket.createMany({ data: ticketRows }),
+  ]);
+
+  const tickets = await prisma.ticket.findMany({ where: { orderId: order.id } });
+
+  logger.info(`Order paid ${updatedOrder.reference} — issued ${tickets.length} tickets`);
+  res.json({ status: 'success', data: { order: serializeOrder(updatedOrder), tickets } });
 });
 
 exports.list = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
-  res.json({ status: 'success', data: { orders } });
+  const orders = await prisma.order.findMany({
+    where: { userId: req.user.id },
+    include: { items: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ status: 'success', data: { orders: orders.map(serializeOrder) } });
 });
 
 exports.getOne = asyncHandler(async (req, res, next) => {
-  const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+  const order = await prisma.order.findFirst({
+    where: { id: req.params.id, userId: req.user.id },
+    include: { items: true },
+  });
   if (!order) return next(new AppError('Order not found', 404));
-  res.json({ status: 'success', data: { order } });
+  res.json({ status: 'success', data: { order: serializeOrder(order) } });
 });

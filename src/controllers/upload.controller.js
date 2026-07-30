@@ -27,7 +27,7 @@ const streamUpload = (buffer, folder, filename) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: `rachead/${folder}`,
+        folder: `fanconnectpro/${folder}`,
         public_id: filename ? filename.replace(/\.[^.]+$/, '') : undefined,
         resource_type: 'image',
         overwrite: false,

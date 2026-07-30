@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { prisma } = require('../config/database');
 const { env } = require('../config/env');
 const { AppError } = require('./errorHandler.middleware');
 
@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id);
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) return next(new AppError('User no longer exists', 401));
     if (!user.isActive) return next(new AppError('Account deactivated', 403));
 

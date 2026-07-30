@@ -1,28 +1,26 @@
-const SponsorshipPackage = require('../models/SponsorshipPackage');
-const Sponsor = require('../models/Sponsor');
-const SponsorshipApplication = require('../models/SponsorshipApplication');
+const { prisma } = require('../config/database');
 const { AppError, asyncHandler } = require('../middleware/errorHandler.middleware');
 const logger = require('../utils/logger');
 
 /* ── Packages ── */
 exports.listPackages = asyncHandler(async (req, res) => {
-  const packages = await SponsorshipPackage.find().sort({ price: -1 });
+  const packages = await prisma.sponsorshipPackage.findMany({ orderBy: { price: 'desc' } });
   res.json({ status: 'success', data: { packages } });
 });
 
 exports.getPackage = asyncHandler(async (req, res, next) => {
-  const pkg = await SponsorshipPackage.findById(req.params.id);
+  const pkg = await prisma.sponsorshipPackage.findUnique({ where: { id: req.params.id } });
   if (!pkg) return next(new AppError('Package not found', 404));
   res.json({ status: 'success', data: { package: pkg } });
 });
 
 /* ── Sponsors ── */
 exports.listSponsors = asyncHandler(async (req, res) => {
-  const filter = {};
-  if (req.query.eventId) filter.eventId = req.query.eventId;
-  if (req.query.platform === 'true') filter.eventId = null;
+  const where = {};
+  if (req.query.eventId) where.eventId = req.query.eventId;
+  if (req.query.platform === 'true') where.eventId = null;
 
-  const sponsors = await Sponsor.find(filter);
+  const sponsors = await prisma.sponsor.findMany({ where });
   res.json({ status: 'success', data: { sponsors } });
 });
 
@@ -30,13 +28,11 @@ exports.listSponsors = asyncHandler(async (req, res) => {
 exports.apply = asyncHandler(async (req, res, next) => {
   const { packageId, eventId } = req.body;
 
-  const pkg = await SponsorshipPackage.findById(packageId);
+  const pkg = await prisma.sponsorshipPackage.findUnique({ where: { id: packageId } });
   if (!pkg) return next(new AppError('Selected package not found', 404));
 
-  const application = await SponsorshipApplication.create({
-    ...req.body,
-    packageName: pkg.name,
-    eventId: eventId || null,
+  const application = await prisma.sponsorshipApplication.create({
+    data: { ...req.body, packageName: pkg.name, eventId: eventId || null },
   });
 
   logger.info(`Sponsorship application from ${application.companyName} for ${pkg.name}`);
@@ -52,18 +48,24 @@ exports.listPendingForEvent = asyncHandler(async (req, res, next) => {
   const { eventId } = req.query;
   if (!eventId) return next(new AppError('eventId query param is required', 400));
 
-  const applications = await SponsorshipApplication.find(
-    { eventId, status: { $in: ['pending', 'reviewing'] } },
-    'companyName packageId packageName status createdAt'
-  )
-    .populate('packageId', 'tier')
-    .sort({ createdAt: -1 });
+  const applications = await prisma.sponsorshipApplication.findMany({
+    where: { eventId, status: { in: ['pending', 'reviewing'] } },
+    select: {
+      id: true,
+      companyName: true,
+      packageName: true,
+      status: true,
+      createdAt: true,
+      package: { select: { tier: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
   const pending = applications.map((a) => ({
-    id: a._id,
+    id: a.id,
     companyName: a.companyName,
     packageName: a.packageName,
-    tier: a.packageId ? a.packageId.tier : undefined,
+    tier: a.package ? a.package.tier : undefined,
     status: a.status,
   }));
 
@@ -71,9 +73,9 @@ exports.listPendingForEvent = asyncHandler(async (req, res, next) => {
 });
 
 exports.listApplications = asyncHandler(async (req, res) => {
-  const filter = {};
-  if (req.query.status) filter.status = req.query.status;
-  const applications = await SponsorshipApplication.find(filter).sort({ createdAt: -1 });
+  const where = {};
+  if (req.query.status) where.status = req.query.status;
+  const applications = await prisma.sponsorshipApplication.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json({ status: 'success', data: { applications } });
 });
 
@@ -83,18 +85,17 @@ exports.listApplications = asyncHandler(async (req, res) => {
  * track the status of sponsorships they've applied for.
  */
 exports.listMine = asyncHandler(async (req, res) => {
-  const applications = await SponsorshipApplication.find({
-    email: req.user.email.toLowerCase(),
-  }).sort({ createdAt: -1 });
+  const applications = await prisma.sponsorshipApplication.findMany({
+    where: { email: req.user.email.toLowerCase() },
+    orderBy: { createdAt: 'desc' },
+  });
   res.json({ status: 'success', data: { applications } });
 });
 
 exports.updateApplication = asyncHandler(async (req, res, next) => {
-  const application = await SponsorshipApplication.findByIdAndUpdate(
-    req.params.id,
-    { status: req.body.status },
-    { new: true, runValidators: true }
-  );
+  const application = await prisma.sponsorshipApplication
+    .update({ where: { id: req.params.id }, data: { status: req.body.status } })
+    .catch(() => null);
   if (!application) return next(new AppError('Application not found', 404));
   res.json({ status: 'success', data: { application } });
 });

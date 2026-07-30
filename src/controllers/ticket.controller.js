@@ -1,16 +1,16 @@
-const Ticket = require('../models/Ticket');
+const { prisma } = require('../config/database');
 const { AppError, asyncHandler } = require('../middleware/errorHandler.middleware');
 
 exports.list = asyncHandler(async (req, res) => {
-  const filter = { user: req.user._id };
-  if (req.query.status) filter.status = req.query.status;
+  const where = { userId: req.user.id };
+  if (req.query.status) where.status = req.query.status;
 
-  const tickets = await Ticket.find(filter).sort({ purchasedAt: -1 });
+  const tickets = await prisma.ticket.findMany({ where, orderBy: { purchasedAt: 'desc' } });
   res.json({ status: 'success', data: { tickets } });
 });
 
 exports.getOne = asyncHandler(async (req, res, next) => {
-  const ticket = await Ticket.findOne({ _id: req.params.id, user: req.user._id });
+  const ticket = await prisma.ticket.findFirst({ where: { id: req.params.id, userId: req.user.id } });
   if (!ticket) return next(new AppError('Ticket not found', 404));
   res.json({ status: 'success', data: { ticket } });
 });

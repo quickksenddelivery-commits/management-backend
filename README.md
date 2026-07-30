@@ -1,11 +1,12 @@
-# management-backend
+# fanconnectpro-backend
 
-Management platform backend — Node.js + Express 5 + Mongoose 9.
+FanConnectPro platform backend — Node.js + Express 5 + Prisma + Neon Postgres.
 
 ## Stack
 
 - **Express 5** — HTTP server & routing
-- **Mongoose 9** — MongoDB ODM
+- **Prisma** — type-safe ORM & migrations
+- **Neon** — serverless Postgres
 - **JWT** — stateless auth (`jsonwebtoken`)
 - **Winston** — structured logging (console in dev, files in prod)
 - **helmet / cors / hpp / compression / express-rate-limit** — security & hardening
@@ -14,8 +15,12 @@ Management platform backend — Node.js + Express 5 + Mongoose 9.
 ## Project structure
 
 ```
-management-backend/
+fanconnectpro-backend/
 ├── server.js                 # bootstrap: env, DB, HTTP server, graceful shutdown
+├── prisma/
+│   └── schema.prisma         # data model: User, Celebrity, Event, TicketTier,
+│                              #   Order, OrderItem, Ticket, Sponsor,
+│                              #   SponsorshipPackage, SponsorshipApplication
 ├── scripts/
 │   ├── seed.js               # seed celebrities/events/packages/sponsors
 │   ├── seed-data.js          # the catalog data (mirrors frontend mock)
@@ -24,11 +29,10 @@ management-backend/
     ├── app.js                # express app: middleware + route mounting
     ├── config/
     │   ├── env.js            # env validation + typed access
-    │   ├── database.js       # mongoose connect / disconnect
+    │   ├── database.js       # Prisma client singleton + connect/disconnect
     │   └── coins.js          # supported crypto coins + fiat→USD conversion
     ├── middleware/           # auth, errorHandler, rateLimit, requestLogger, validate
-    ├── models/               # User, Celebrity, Event, Order, Ticket,
-    │                         #   SponsorshipPackage, Sponsor, SponsorshipApplication
+    ├── services/             # user.service.js — password hashing, login-lock logic
     ├── controllers/          # auth, user, celebrity, event, payment,
     │                         #   order, ticket, sponsorship
     ├── routes/               # one router per resource (mounted under /api/*)
@@ -38,23 +42,30 @@ management-backend/
 ## Getting started
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (also runs `prisma generate` via postinstall)
 npm install
 
 # 2. Create your env file
-cp .env.example .env        # then edit values (MONGODB_URI, JWT secrets, …)
+cp .env.example .env        # then edit values (DATABASE_URL from Neon, JWT secrets, …)
 
-# 3. Make sure MongoDB is running, then seed the catalog + first admin
+# 3. Push the schema to your Neon database
+npm run migrate              # prisma migrate dev — creates tables + migration history
+
+# 4. Seed the catalog + first admin
 npm run seed
 npm run seed:admin
 
-# 4. Run the dev server (auto-reload)
+# 5. Run the dev server (auto-reload)
 npm run dev
 ```
 
+`DATABASE_URL` comes from your Neon project dashboard → **Connection Details**
+(use the pooled connection string, and keep `?sslmode=require`). `npm run studio`
+opens Prisma Studio, a GUI for browsing/editing the Neon database directly.
+
 Server starts on `http://localhost:5001` (configurable via `PORT`).
 
-This is the API for the **Rachead** celebrity-events & ticketing platform
+This is the API for the **FanConnectPro** celebrity-events & ticketing platform
 (frontend: `../management`). All payments settle in cryptocurrency.
 
 All responses use the shape `{ status, data?, meta?, message? }`. List endpoints
@@ -145,20 +156,20 @@ then to the chosen coin. Seat reservation is atomic and guarded against oversell
 ```bash
 curl -X POST http://localhost:5001/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@rachead.local","password":"ChangeMe@123"}'
+  -d '{"email":"admin@fanconnectpro.local","password":"ChangeMe@123"}'
 ```
 
 ## Seeding
 
 ```bash
 npm run seed         # celebrities, events, sponsorship packages & sponsors (mirrors frontend mock)
-npm run seed:admin   # first admin user (admin@rachead.local / ChangeMe@123)
+npm run seed:admin   # first admin user (admin@fanconnectpro.local / ChangeMe@123)
 ```
 
 ## Adding a resource
 
-1. Create the schema in `src/models/<Name>.js`.
-2. Add `src/controllers/<name>.controller.js` (wrap handlers in `asyncHandler`).
+1. Add a `model` block to `prisma/schema.prisma`, then run `npm run migrate` to generate & apply the migration.
+2. Add `src/controllers/<name>.controller.js` (wrap handlers in `asyncHandler`, query via `prisma.<model>`).
 3. Add `src/routes/<name>.routes.js` (validation via `express-validator` + `validate`).
 4. Mount it in `src/app.js`: `app.use('/api/<name>', require('./routes/<name>.routes'))`.
 5. Protect routes with `authenticate` and, if needed, `authorize('admin')`.
