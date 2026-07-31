@@ -7,6 +7,7 @@ const { celebrities, events, sponsorshipPackages, sponsors } = require('./seed-d
   console.log('Connected to Postgres');
 
   console.log('Clearing existing catalog data…');
+  await prisma.sponsorshipApplication.deleteMany({});
   await prisma.sponsor.deleteMany({});
   await prisma.event.deleteMany({});
   await prisma.celebrity.deleteMany({});

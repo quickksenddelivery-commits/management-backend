@@ -16,11 +16,9 @@ const COINS = [
 /** 1 unit of fiat = X USD (indicative) */
 const FIAT_USD = {
   USD: 1,
-  NGN: 1 / 1600,
-  ZAR: 1 / 18,
   GBP: 1.27,
-  KES: 1 / 130,
-  GHS: 1 / 15,
+  CAD: 0.73,
+  AUD: 0.66,
 };
 
 const getCoin = (symbol) => COINS.find((c) => c.symbol === String(symbol).toUpperCase());
