@@ -12,20 +12,28 @@ const E = (id) => U(id, 800, 450, 'center'); // poster 16:9
 
 const celebrities = [
   {
+    // Real photo — MrBeast 2023.jpg, CC-BY-4.0, © Steven Khan, via Wikimedia Commons
+    // https://commons.wikimedia.org/wiki/File:MrBeast_2023.jpg
     id: 'celeb-1', name: 'MrBeast', category: 'influencer',
-    image: P('1487412720507-e7ab37603c6f'), coverImage: C('1519085360753-af0119f7cbe7'),
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/MrBeast_2023.jpg/960px-MrBeast_2023.jpg',
+    coverImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/MrBeast_2023.jpg/1280px-MrBeast_2023.jpg',
     verified: true, followers: 250000000, nationality: 'American',
     bio: "The world's biggest YouTuber, known for elaborate high-stakes challenges, viral philanthropy, and building one of the largest content empires on the internet.",
   },
   {
+    // No freely-licensed press photo found for this creator — kept as a generic
+    // placeholder portrait until a real, rights-cleared image is provided.
     id: 'celeb-2', name: 'Rob Malloy', category: 'influencer',
     image: P('1502764613149-7f1d229e230f'), coverImage: C('1517841905240-472988babdf9'),
     verified: true, followers: 5000000, nationality: 'American',
     bio: 'Digital creator and lifestyle influencer known for engaging vlogs, brand collaborations, and a rapidly growing fanbase across social platforms.',
   },
   {
+    // Real photo — Kevin Costner 2016.jpg, public domain (NASA/Bill Ingalls), via Wikimedia Commons
+    // https://commons.wikimedia.org/wiki/File:Kevin_Costner_2016.jpg
     id: 'celeb-3', name: 'Kevin Costner', category: 'actor',
-    image: P('1552058544-f2b08422138a'), coverImage: C('1544005313-94ddf0286df2'),
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Kevin_Costner_2016.jpg/960px-Kevin_Costner_2016.jpg',
+    coverImage: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Kevin_Costner_2016.jpg/1280px-Kevin_Costner_2016.jpg',
     verified: true, followers: 3500000, nationality: 'American',
     bio: 'Academy Award-winning American actor and filmmaker, celebrated for iconic roles across film and television, from sweeping westerns to modern television drama.',
   },
