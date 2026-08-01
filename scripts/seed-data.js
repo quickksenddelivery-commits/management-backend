@@ -50,7 +50,7 @@ const events = [
     tags: ['Influencer', 'Los Angeles', 'Family', 'Live Event'],
     ticketTiers: [
       { id: 'tier-1-1', name: 'General', price: 95, currency: 'USD', available: 10000, total: 15000, tier: 'general', perks: ['Standard admission'] },
-      { id: 'tier-1-2', name: 'VIP', price: 300, currency: 'USD', available: 500, total: 800, tier: 'vip', perks: ['Priority seating', 'Exclusive merch pack', 'Early entry'] },
+      { id: 'tier-1-2', name: 'Top Fan', price: 300, currency: 'USD', available: 500, total: 800, tier: 'vip', perks: ['Priority seating', 'Exclusive merch pack', 'Early entry'] },
       { id: 'tier-1-3', name: 'Meet & Greet', price: 900, currency: 'USD', available: 30, total: 50, tier: 'meetgreet', perks: ['Personal meet with MrBeast', 'Photo op', 'Signed merch'] },
     ],
   },
@@ -64,7 +64,7 @@ const events = [
     tags: ['Influencer', 'Chicago', 'Meetup'],
     ticketTiers: [
       { id: 'tier-2-1', name: 'General', price: 40, currency: 'USD', available: 800, total: 1200, tier: 'general', perks: ['Standard admission'] },
-      { id: 'tier-2-2', name: 'VIP Meet & Greet', price: 150, currency: 'USD', available: 60, total: 100, tier: 'meetgreet', perks: ['Meet & greet', 'Photo op', 'Exclusive merch'] },
+      { id: 'tier-2-2', name: 'Top Fan Meet & Greet', price: 150, currency: 'USD', available: 60, total: 100, tier: 'meetgreet', perks: ['Meet & greet', 'Photo op', 'Exclusive merch'] },
     ],
   },
   {
@@ -102,7 +102,7 @@ const sponsorshipPackages = [
     id: 'pkg-platinum', tier: 'platinum', name: 'Platinum', tagline: 'Premium visibility across the experience.',
     price: 25000, currency: 'USD', slotsTotal: 4, slotsAvailable: 3, popular: true,
     benefits: [
-      'Main-stage branding & screen placement', '10 VIP passes',
+      'Main-stage branding & screen placement', '10 Top Fan passes',
       'Branded activation booth (prime location)', 'Logo on event page, tickets & emails',
       'Social media features (3 posts)', 'Inclusion in event press kit',
     ],
@@ -110,12 +110,12 @@ const sponsorshipPackages = [
   {
     id: 'pkg-gold', tier: 'gold', name: 'Gold', tagline: 'Strong presence, great value.',
     price: 10000, currency: 'USD', slotsTotal: 8, slotsAvailable: 6,
-    benefits: ['Logo on event page & on-site materials', '4 VIP passes', 'Activation booth space', 'One social media mention'],
+    benefits: ['Logo on event page & on-site materials', '4 Top Fan passes', 'Activation booth space', 'One social media mention'],
   },
   {
     id: 'pkg-silver', tier: 'silver', name: 'Silver', tagline: 'Get your brand in front of the crowd.',
     price: 5000, currency: 'USD', slotsTotal: 15, slotsAvailable: 11,
-    benefits: ['Logo on event website', '2 VIP passes', 'Newsletter mention'],
+    benefits: ['Logo on event website', '2 Top Fan passes', 'Newsletter mention'],
   },
   {
     id: 'pkg-community', tier: 'community', name: 'Community Partner', tagline: 'Support the movement.',
