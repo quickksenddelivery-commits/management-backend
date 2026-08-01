@@ -56,7 +56,17 @@ exports.update = asyncHandler(async (req, res, next) => {
 });
 
 exports.remove = asyncHandler(async (req, res, next) => {
-  const celebrity = await prisma.celebrity.delete({ where: { id: req.params.id } }).catch(() => null);
-  if (!celebrity) return next(new AppError('Celebrity not found', 404));
+  const existing = await prisma.celebrity.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!existing) return next(new AppError('Celebrity not found', 404));
+
+  const eventCount = await prisma.event.count({ where: { celebrityId: req.params.id } });
+  if (eventCount > 0) {
+    return next(new AppError(
+      `Cannot delete — this celebrity still has ${eventCount} event${eventCount > 1 ? 's' : ''}. Delete their events first.`,
+      409
+    ));
+  }
+
+  await prisma.celebrity.delete({ where: { id: req.params.id } });
   res.json({ status: 'success', message: 'Celebrity deleted' });
 });

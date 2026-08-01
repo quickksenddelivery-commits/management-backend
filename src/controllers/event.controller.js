@@ -86,7 +86,9 @@ exports.update = asyncHandler(async (req, res, next) => {
 });
 
 exports.remove = asyncHandler(async (req, res, next) => {
-  const event = await prisma.event.delete({ where: { id: req.params.id } }).catch(() => null);
-  if (!event) return next(new AppError('Event not found', 404));
+  const existing = await prisma.event.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!existing) return next(new AppError('Event not found', 404));
+
+  await prisma.event.delete({ where: { id: req.params.id } });
   res.json({ status: 'success', message: 'Event deleted' });
 });
